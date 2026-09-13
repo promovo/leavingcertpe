@@ -20,10 +20,17 @@ $w.onReady(async function () {
   setupButtons();
   setupRepeaters();
 
+  // Wix can finish restoring a member session after the page is ready.
+  // Re-run the access check as soon as that happens so signed-in members
+  // are never left looking at the logged-out panel.
+  authentication.onLogin(async () => {
+    await enterLoggedInFlow();
+  });
+
   $w('#loginText').text =
     'Please log in or create an account to access the Resource Library.';
 
-  const member = await getCurrentMemberWithRetry(5, 250);
+  const member = await getCurrentMemberWithRetry(15, 300);
 
   if (!member?._id) {
     console.log('Resource Library: visitor is logged out');
@@ -230,12 +237,12 @@ function setupButtons() {
     wixLocationFrontend.to('/join-school');
   });
 
-  $w('#schoolPlanButton').onClick(() => {
-    wixLocationFrontend.to('/pricing-plans');
+  $w('#schoolPlanButton').onClick(async () => {
+    await purchasePlan('SCHOOL');
   });
 
-  $w('#individualPlanButton').onClick(() => {
-    wixLocationFrontend.to('/pricing-plans');
+  $w('#individualPlanButton').onClick(async () => {
+    await purchasePlan('INDIVIDUAL');
   });
 
   $w('#backToChaptersButton').onClick(async () => {
@@ -300,7 +307,17 @@ async function loadNoAccessState() {
 }
 
 async function purchasePlan(type) {
+  const buttonSelector =
+    type === 'SCHOOL'
+      ? '#schoolPlanButton'
+      : '#individualPlanButton';
+
   try {
+    $w(buttonSelector).disable();
+
+    $w('#noAccessHeading').text =
+      'Opening secure checkout…';
+
     if (!accessOffer?.ok) {
       accessOffer = await getPublicAccessOffer();
     }
@@ -316,7 +333,9 @@ async function purchasePlan(type) {
 
     await checkout.startOnlinePurchase(planId);
 
-    for (let attempt = 0; attempt < 8; attempt += 1) {
+    // The paid-order event is asynchronous. Give Wix enough time to create
+    // the pending access record before moving the buyer to setup.
+    for (let attempt = 0; attempt < 20; attempt += 1) {
       await delay(1000);
 
       const pending = await getPendingPaidSetup();
@@ -333,6 +352,12 @@ async function purchasePlan(type) {
 
     $w('#noAccessHeading').text =
       'We could not start this purchase. Please try again.';
+  } finally {
+    try {
+      $w(buttonSelector).enable();
+    } catch (error) {
+      console.log('Could not reset purchase button:', error);
+    }
   }
 }
 
