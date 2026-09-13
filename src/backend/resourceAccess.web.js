@@ -959,7 +959,11 @@ export const completePaidAccessSetup = webMethod(
       const yearGroup = cleanText(input.yearGroup, 40);
 
 
-      if (!schoolName || !firstName || !lastName) {
+      if (
+        !firstName ||
+        !lastName ||
+        (pending.accessType === ACCESS_SCHOOL && !schoolName)
+      ) {
         return { ok: false, code: 'REQUIRED_SETUP_DETAILS_MISSING' };
       }
 
