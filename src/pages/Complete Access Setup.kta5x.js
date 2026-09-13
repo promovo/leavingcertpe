@@ -56,9 +56,16 @@ $w.onReady(async function () {
 
       hideAndCollapse('#yearGroupInput');
 
+      showAndExpand('#schoolNameInput');
+
     } else {
 
       showAndExpand('#yearGroupInput');
+
+      // School name is only relevant to a school subscription.
+      $w('#schoolNameInput').value = '';
+
+      hideAndCollapse('#schoolNameInput');
 
     }
 
@@ -91,10 +98,16 @@ async function submitSetup() {
     String($w('#yearGroupInput').value || '').trim();
 
 
-  if (!schoolName || !firstName || !lastName) {
+  if (
+    !firstName ||
+    !lastName ||
+    (pendingAccessType === 'SCHOOL' && !schoolName)
+  ) {
 
     showError(
-      'Please enter your school name, first name and last name.'
+      pendingAccessType === 'SCHOOL'
+        ? 'Please enter your school name, first name and last name.'
+        : 'Please enter your first name and last name.'
     );
 
     return;
